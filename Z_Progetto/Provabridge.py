@@ -17,7 +17,7 @@ def myNetwork():
 	s1 = net.addSwitch('s1')
 	Intf( 'eth1', node=s1 )
 	s1.cmd('ovs-vsctl add-port s1 eth1')
-	#s1.cmd('ifconfig s1 192.168.33.30') #non funziona nello script idk, quindi esecuzione in python
+	#s1.cmd('ifconfig s1 192.168.33.30') #not works
 	
 
 	info( '*** Add hosts\n')

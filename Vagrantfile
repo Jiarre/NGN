@@ -201,7 +201,9 @@ But the script will check and perform upgrade automatically and it does not take
     # - Uncomment the underlying line to add a private network to the VM.
     #   If VirtualBox is used as the hypervisor, this means adding or using (if already created) a host-only interface to the VM.
     # comnetsemu.vm.network "private_network", ip: "192.168.0.2"
-    config.vm.network "public_network", bridge: "Intel(R) Ethernet Connection I217-LM", ip: "192.168.33.2/24" #"Microsoft Wi-Fi Direct Virtual Adapter #4"
+    
+    # If the name of interface does not exist, vagrant ask the correct name
+    config.vm.network "public_network", bridge: "Intel(R) Ethernet Connection I217-LM", ip: "192.168.33.2"
 
     # Enable X11 forwarding
     comnetsemu.ssh.forward_agent = true
