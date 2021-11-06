@@ -104,8 +104,6 @@ Vagrant.configure("2") do |config|
       # MARK: The CPU should enable SSE3 or SSE4 to compile DPDK applications.
       vb.customize ["setextradata", :id, "VBoxInternal/CPUM/SSE4.1", "1"]
       vb.customize ["setextradata", :id, "VBoxInternal/CPUM/SSE4.2", "1"]
-      # Set Promiscuous mode to allow flow of mininet's hosts packets in network managed by Vbox
-      vb.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
     end
 
     comnetsemu.vm.provider "libvirt" do |libvirt|
@@ -201,7 +199,6 @@ But the script will check and perform upgrade automatically and it does not take
     # - Uncomment the underlying line to add a private network to the VM.
     #   If VirtualBox is used as the hypervisor, this means adding or using (if already created) a host-only interface to the VM.
     # comnetsemu.vm.network "private_network", ip: "192.168.0.2"
-    config.vm.network "public_network", bridge: "Intel(R) Ethernet Connection I217-LM", ip: "192.168.33.2/24" #"Microsoft Wi-Fi Direct Virtual Adapter #4"
 
     # Enable X11 forwarding
     comnetsemu.ssh.forward_agent = true
