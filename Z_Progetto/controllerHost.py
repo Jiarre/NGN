@@ -2,6 +2,7 @@
 import os
 import subprocess
 import socket
+import netifaces
 import re
 
 """
@@ -10,10 +11,13 @@ paccheto WOL lo fa ryu sul controller
 parser di controllo sul pacchetto eth personale
 	-> cancellazione regola ip table in base la valore all'interno di un file
 """
+# Personal define of Ethernet Packet Type following /usr/include/linux/if_ether.h
+ETH_P_WOL = 0x0842
+WOL_SIZE = 116  # Size of WOL packet without optional headers
+MAC_BROADCAST_B = bytes.fromhex("F" * 12)
 
 
 def ipt_roules(status):
-
 	# Get local ip
 	ip = subprocess.check_output("hostname -I | awk '{print $1}'", shell=True).decode("utf-8")[:-1]
 
@@ -25,18 +29,43 @@ def ipt_roules(status):
 		os.system("iptables -D INPUT -d "+ip+" -j REJECT")
 
 
+def update_status(hostname):
+	sdir = os.getenv("statusdir")
+	sfilep = sdir+"/"+hostname
+	sfile = open(sfilep, 'r')
+	status = sfile.read()
+	sfile.close()
+	if status == "DOWN":
+		status = "UP"
+	elif status == "UP":
+		status = "DOWN"
+	else:
+		print(hostname + " has an Invalid status")
+
+	sfile = open(sfilep, 'w')
+	sfile.write(status)
+	sfile.close()
+	ipt_roules(status)
+	print(hostname + " is now " + status)
+
+
+
+def check_mac(mac):
+	return re.fullmatch(
+		'^([A-F0-9]{2}(([:][A-F0-9]{2}){5}|([-][A-F0-9]{2}){5})|([\s][A-F0-9]{2}){5})|'
+		'([a-f0-9]{2}(([:][a-f0-9]{2}){5}|([-][a-f0-9]{2}){5}|([\s][a-f0-9]{2}){5}))$',
+		mac)
+
+
 def create_packet(mac_src):
 	eth_type = bytes.fromhex("1111")  # int -> 4369
-	mac_dst = bytes.fromhex("F"*12)
+	mac_dst = MAC_BROADCAST_B
 
 	wol_dst = input("Provide the hostname or complete MAC address\n"
-									"(accepted separator separator [:-\s]) of the machine to WOL: ")
+									"(accepted separator separator [:-\]) of the machine to WOL: ")
 	# Check mac address format
-	addr = re.fullmatch(
-		'^([A-F0-9]{2}(([:][A-F0-9]{2}){5}|([-][A-F0-9]{2}){5})|([s][A-F0-9]{2}){5})|'
-		'([a-f0-9]{2}(([:][a-f0-9]{2}){5}|([-][a-f0-9]{2}){5}|([s][a-f0-9]{2}){5}))$',
-		wol_dst)
-	hostname = re.fullmatch('^h[0-9]*',	wol_dst)
+	addr = check_mac(wol_dst)
+	hostname = re.fullmatch('^h\d+',	wol_dst)
 
 	# 1 match, or the MAC is invalid
 	if addr:
@@ -57,12 +86,11 @@ def create_packet(mac_src):
 
 
 def send_packet():
-
 	s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
 	if len(socket.if_nameindex()) > 2:
-		for x in socket.if_nameindex():
-			print(str(x[0]) + " -> " + x[1])
-		idx = input("Choose the index of the interface where send the packet: ")
+		for i in socket.if_nameindex():
+			print(str(i[0]) + " -> " + i[1])
+		idx = int(input("Choose the index of the interface where send the packet: "))
 	else:
 		# Speed up in best case scenarios, excluding loopback interface
 		idx = 2
@@ -74,17 +102,39 @@ def send_packet():
 	s.send(data)
 
 
+def check_packet(data) -> bool:
+	res = False
+	for i in netifaces.interfaces():
+		i_mac = str(netifaces.ifaddresses(i)[netifaces.AF_LINK][0].get('addr')).replace(':', '')
+		if data[0:6].hex() == i_mac:
+			mac_src = data[6:12].hex(':')
+			if check_mac(mac_src):
+				if int.from_bytes(data[12:14], "big") == ETH_P_WOL:
+					if data[14:20] == MAC_BROADCAST_B:
+						if data[20:].hex() == i_mac*16:
+							print("Packet received on " + i + " interface from " + mac_src)
+							res = True
+
+	return res
+
+
 def get_packet():
-	#
-	return
-
-
-def check_packet():
-	#
-	return
+	s_rec = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_WOL))
+	# s_rec.bind((interface, 0)) # not necessary -> listening on all interfaces
+	size = WOL_SIZE
+	payload = s_rec.recv(size)
+	if check_packet(payload):
+		ifaces = netifaces.interfaces()
+		# Check the nuber of host (of mininet)
+		hostname = re.search('^(h\d+)-eth0$', ifaces[1]).group(1)
+		if hostname != "":
+			update_status(hostname);
+		else:
+			print("Error recognising hostname")
 
 
 # MAIN
 
 
 send_packet()
+get_packet()
