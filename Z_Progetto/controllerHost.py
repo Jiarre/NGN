@@ -5,12 +5,6 @@ import socket
 import netifaces
 import re
 
-"""
-creare pacchetto eth personale (solo mac dest)
-paccheto WOL lo fa ryu sul controller
-parser di controllo sul pacchetto eth personale
-	-> cancellazione regola ip table in base la valore all'interno di un file
-"""
 # Personal define of Ethernet Packet Type following /usr/include/linux/if_ether.h
 ETH_P_WOL = 0x0842
 WOL_SIZE = 116  # Size of WOL packet without optional headers
@@ -23,18 +17,33 @@ def ipt_roules(status):
 
 	if status == "DOWN":
 		# Add Rule
-		os.system("iptables -A INPUT -d "+ip+" -j REJECT")
+		os.system("iptables -A INPUT -d "+ip+" -j REJECT 2> /dev/null")
 	else:
 		# Delete Rule
-		os.system("iptables -D INPUT -d "+ip+" -j REJECT")
+		os.system("iptables -D INPUT -d "+ip+" -j REJECT 2> /dev/null")
+
+	print("IPTABLES rules updated")
 
 
-def update_status(hostname):
-	sdir = os.getenv("statusdir")
-	sfilep = sdir+"/"+hostname
+def get_status(hostname):
+	sdir = str(os.getenv("statusdir"))
+	sfilep = sdir + "/" + hostname
 	sfile = open(sfilep, 'r')
 	status = sfile.read()
 	sfile.close()
+	return status
+
+
+def set_status(hostname, status):
+	sdir = str(os.getenv("statusdir"))
+	sfilep = sdir + "/" + hostname
+	sfile = open(sfilep, 'w')
+	sfile.write(status)
+	sfile.close()
+
+
+def update_status(hostname):
+	status = get_status(hostname)
 	if status == "DOWN":
 		status = "UP"
 	elif status == "UP":
@@ -42,12 +51,9 @@ def update_status(hostname):
 	else:
 		print(hostname + " has an Invalid status")
 
-	sfile = open(sfilep, 'w')
-	sfile.write(status)
-	sfile.close()
+	set_status(hostname, status)
 	ipt_roules(status)
 	print(hostname + " is now " + status)
-
 
 
 def check_mac(mac):
@@ -65,14 +71,14 @@ def create_packet(mac_src):
 									"(accepted separator separator [:-\]) of the machine to WOL: ")
 	# Check mac address format
 	addr = check_mac(wol_dst)
-	hostname = re.fullmatch('^h\d+',	wol_dst)
+	hostname = re.fullmatch('^h\d+$',	wol_dst)
 
 	# 1 match, or the MAC is invalid
-	if addr:
+	if addr is not None:
 		# Remove mac separator [:-\s] and convert to bytes
 		mac_addr = bytes.fromhex(wol_dst.replace(wol_dst[2], ''))
 	else:
-		if hostname:
+		if hostname is not None and hostname.group(0) != get_hostname():
 			# Get index of the host and create MAC address from that with padding
 			mac_addr = bytes([int(wol_dst.replace('h', ''))]).rjust(6, b'\x00')
 		else:
@@ -118,23 +124,25 @@ def check_packet(data) -> bool:
 	return res
 
 
+def get_hostname() -> str:
+	ifaces = netifaces.interfaces()
+	# Check the nuber of host (of mininet)
+	hostname = re.search('^(h\d+)-eth0$', ifaces[1]).group(1)
+	if hostname != "":
+		return hostname
+	else:
+		print("Error recognising hostname")
+
+
 def get_packet():
 	s_rec = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_WOL))
 	# s_rec.bind((interface, 0)) # not necessary -> listening on all interfaces
 	size = WOL_SIZE
 	payload = s_rec.recv(size)
 	if check_packet(payload):
-		ifaces = netifaces.interfaces()
-		# Check the nuber of host (of mininet)
-		hostname = re.search('^(h\d+)-eth0$', ifaces[1]).group(1)
+		hostname = get_hostname()
 		if hostname != "":
-			update_status(hostname);
+			update_status(hostname)
 		else:
 			print("Error recognising hostname")
 
-
-# MAIN
-
-
-send_packet()
-get_packet()

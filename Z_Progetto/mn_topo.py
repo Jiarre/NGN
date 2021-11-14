@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 
 from mininet.cli import CLI
 from mininet.log import setLogLevel
@@ -7,12 +8,12 @@ from mininet.net import Mininet
 from mininet.topo import Topo
 from mininet.node import RemoteController, OVSSwitch
 
+SDIR = "/tmp/NGN/hosts"
+TONULL = "&>/dev/null"
+
 class MinimalTopo( Topo ):
-    "Minimal topology with a single switch and two hosts"
 
     def build( self ):
-        # Create two hosts.
-        n_host = 12
         hosts = []
         h1 = self.addHost( 'h1' , ip="192.168.1.11" )
         h2 = self.addHost( 'h2', ip="192.168.1.12" )
@@ -39,13 +40,9 @@ class MinimalTopo( Topo ):
         hosts.append(h10)
         hosts.append(h11)
         hosts.append(h12)
-        
-        
-        
 
 
-
-        # Create a switch
+        # Create switches
         s1 = self.addSwitch( 's1' )
         s2 = self.addSwitch( 's2' )
         s3 = self.addSwitch( 's3' )
@@ -73,15 +70,32 @@ class MinimalTopo( Topo ):
         self.addLink( s3, s4 )
         self.addLink( s3, s2 )
 
-        
-        
-       
-        
+        print("*** Setting files and directories")
 
-        
+        if os.path.exists(SDIR):
+            shutil.rmtree(SDIR)
+        os.makedirs(SDIR)
+        os.environ["statusdir"] = SDIR
+
+        for i in range(1, len(hosts) + 1):
+            host = "h" + str(i)
+            file = SDIR + "/" + host
+            # Set status file
+            try:
+                f = open(file, 'x')
+                if i == 1:
+                    # Only h1 stars UP
+                    f.write("UP")
+                else:
+                    f.write("DOWN")
+                f.close()
+            except OSError:
+                print("Failed creating the file")
+            else:
+                print("File " + file + " created")
+
 
 def runMinimalTopo():
-
     # Create an instance of our topology
     topo = MinimalTopo()
 
@@ -100,38 +114,28 @@ def runMinimalTopo():
     node2 = net.getNodeByName("s2")
     node3 = net.getNodeByName("s3")
     node4 = net.getNodeByName("s4")
-    print("*** Imposto flow di base sugli switch")
+    print("*** Setting basic flow on switches")
     node1.cmd("sudo ovs-ofctl add-flow s1 dl_type=0x1111,action=controller")
     node2.cmd("sudo ovs-ofctl add-flow s2 dl_type=0x1111,action=controller")
     node3.cmd("sudo ovs-ofctl add-flow s3 dl_type=0x1111,action=controller")
     node4.cmd("sudo ovs-ofctl add-flow s4 dl_type=0x1111,action=controller")
-    print("*** Spengo tutti gli host tranne h1")
-    sdir = "/tmp/NGN/hosts"
-    if os.path.exists(sdir):
-        shutil.rmtree(sdir)
-    os.makedirs(sdir)
-    n_host = 12
-    os.environ["statusdir"] = sdir
-    for i in range(1, n_host+1):
-        file = sdir+"/h"+str(i)
-        try:
-            f = open(file, 'x')
-            if i == 1:
-                # Only h1 stars UP
-                f.write("UP")
-            else:
-                f.write("DOWN")
-            f.close()
-        except OSError:
-            print("Failed creating the file")
-        else:
-            print("File " + file + " created")
 
-    CLI( net )
+    print("*** Executing background scripts")
+    for h in net.hosts:
+        command = f"xterm -T 'Background script on {str(h)}' -e 'python3 backgroundHost.py {str(h)}'"
+        h.cmd(command + TONULL + " &")   # & for no-wait execution
+        print(f"Stated {str(h)} script")
+    print("All scripts stated")
+
+    # Run the summary status script NOT WORKING (not return the control to parent idk
+    # command = f"xterm -T 'Status of all hosts' -e 'watch -n 1 python3 getStatusHosts.py'"
+    # os.system(command + TONULL + " &")
+
+    CLI(net)
 
     # After the user exits the CLI, shutdown the network.
     net.stop()
-    shutil.rmtree(sdir)
+    shutil.rmtree(SDIR)
 
 
 if __name__ == '__main__':
