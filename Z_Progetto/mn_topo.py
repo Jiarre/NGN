@@ -7,6 +7,7 @@ from mininet.log import setLogLevel
 from mininet.net import Mininet
 from mininet.topo import Topo
 from mininet.node import RemoteController, OVSSwitch
+from mininet.term import makeTerm
 
 SDIR = "/tmp/NGN/hosts"
 TONULL = "&>/dev/null"
@@ -122,8 +123,10 @@ def runMinimalTopo():
 
     print("*** Executing background scripts")
     for h in net.hosts:
-        command = f"xterm -T 'Background script on {str(h)}' -e 'python3 backgroundHost.py {str(h)}'"
-        h.cmd(command + TONULL + " &")   # & for no-wait execution
+        # Not work because not return control to mininet
+        # command = f"xterm -T 'Background script on {str(h)}' -e 'python3 backgroundHost.py {str(h)};'"
+        # h.cmd(command + TONULL + " &")   # & for no-wait execution
+        net.terms += makeTerm(h, f"Background script on {str(h)}", cmd=f"python3 backgroundHost.py {str(h)}")
         print(f"Stated {str(h)} script")
     print("All scripts stated")
 
