@@ -72,29 +72,30 @@ class MinimalTopo( Topo ):
         self.addLink( s3, s2 )
 
         print("*** Setting files and directories")
-
+        os.umask(0000)
         if os.path.exists(SDIR):
             shutil.rmtree(SDIR)
-        # os.makedirs(SDIR) #recursive
-        os.makedirs(f"{SDIR}/LOGs", 0o777)
+        os.makedirs(f"{SDIR}/LOGs")
         os.environ["statusdir"] = SDIR
 
-        for i in range(1, len(hosts) + 1):
-            host = "h" + str(i)
-            file = SDIR + "/" + host
+        for h in hosts:
+            host = str(h)
+            fileS = f"{SDIR}/{host}"
+            fileL = f"{SDIR}/LOGs/{host}.log"
             # Set status file
             try:
-                f = open(os.open(file, os.O_CREAT | os.O_WRONLY, 0o777), 'w')
-                if i == 1:
+                os.close(os.open(fileL, os.O_CREAT | os.O_WRONLY, 0o777))
+                f = open(os.open(fileS, os.O_CREAT | os.O_WRONLY, 0o777), 'w')
+                if host == "h1":
                     # Only h1 stars UP
                     f.write("UP")
                 else:
                     f.write("DOWN")
                 f.close()
             except OSError:
-                print("Failed creating the file")
+                print("Failed creating files")
             else:
-                print("File " + file + " created")
+                print(f"Files of host {host} created")
 
 
 def runMinimalTopo():
@@ -124,16 +125,12 @@ def runMinimalTopo():
 
     print("*** Executing background scripts")
     for h in net.hosts:
-        # Not work because not return control to mininet
-        # command = f"xterm -T 'Background script on {str(h)}' -e 'python3 backgroundHost.py {str(h)};'"
-        # h.cmd(command + TONULL + " &")   # & for no-wait execution #>{SDIR}/LOGs/{str(h)}.log
-        # umask 0;
-        h.cmd(f"python3 backgroundHost.py {str(h)} {SDIR}/LOGs/{str(h)}.log &")
+        h.cmd(f"(python3 backgroundHost.py {str(h)} &> {SDIR}/LOGs/{str(h)}.log) &")
         # Start script slowly because jumps host if faster
         time.sleep(0.01)
         # net.terms += makeTerm(h, f"Background script on {str(h)}", cmd=f"python3 backgroundHost.py {str(h)}")
-        print(f"Stated {str(h)} script")
-    print("All scripts stated")
+        print(f"Started {str(h)} script")
+    print("All scripts started")
 
     # Run the summary status script NOT WORKING (not return the control to parent idk
     # command = f"xterm -T 'Status of all hosts' -e 'watch -n 1 python3 getStatusHosts.py'"
