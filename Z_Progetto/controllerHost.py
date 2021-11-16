@@ -17,10 +17,12 @@ def ipt_roules(status):
 
 	if status == "DOWN":
 		# Add Rule
-		os.system("iptables -A INPUT -d "+ip+" -j REJECT 2> /dev/null")
+		os.system("iptables -A INPUT -d " + ip + " -j REJECT 2> /dev/null")
+		os.system("iptables -A OUTPUT -s " + ip + " -j REJECT 2> /dev/null")
 	else:
 		# Delete Rule
-		os.system("iptables -D INPUT -d "+ip+" -j REJECT 2> /dev/null")
+		os.system("iptables -D INPUT -d " + ip + " -j REJECT 2> /dev/null")
+		os.system("iptables -D OUTPUT -s " + ip + " -j REJECT 2> /dev/null")
 
 	print("IPTABLES rules updated")
 
