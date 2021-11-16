@@ -1,6 +1,6 @@
 import os
 import shutil
-import subprocess
+import time
 
 from mininet.cli import CLI
 from mininet.log import setLogLevel
@@ -75,7 +75,8 @@ class MinimalTopo( Topo ):
 
         if os.path.exists(SDIR):
             shutil.rmtree(SDIR)
-        os.makedirs(SDIR)
+        # os.makedirs(SDIR) #recursive
+        os.makedirs(f"{SDIR}/LOGs", 0o777)
         os.environ["statusdir"] = SDIR
 
         for i in range(1, len(hosts) + 1):
@@ -83,7 +84,7 @@ class MinimalTopo( Topo ):
             file = SDIR + "/" + host
             # Set status file
             try:
-                f = open(file, 'x')
+                f = open(os.open(file, os.O_CREAT | os.O_WRONLY, 0o777), 'w')
                 if i == 1:
                     # Only h1 stars UP
                     f.write("UP")
@@ -125,8 +126,12 @@ def runMinimalTopo():
     for h in net.hosts:
         # Not work because not return control to mininet
         # command = f"xterm -T 'Background script on {str(h)}' -e 'python3 backgroundHost.py {str(h)};'"
-        # h.cmd(command + TONULL + " &")   # & for no-wait execution
-        net.terms += makeTerm(h, f"Background script on {str(h)}", cmd=f"python3 backgroundHost.py {str(h)}")
+        # h.cmd(command + TONULL + " &")   # & for no-wait execution #>{SDIR}/LOGs/{str(h)}.log
+        # umask 0;
+        h.cmd(f"python3 backgroundHost.py {str(h)} {SDIR}/LOGs/{str(h)}.log &")
+        # Start script slowly because jumps host if faster
+        time.sleep(0.01)
+        # net.terms += makeTerm(h, f"Background script on {str(h)}", cmd=f"python3 backgroundHost.py {str(h)}")
         print(f"Stated {str(h)} script")
     print("All scripts stated")
 
