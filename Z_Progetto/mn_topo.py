@@ -125,9 +125,10 @@ def runMinimalTopo():
 
     print("*** Executing background scripts")
     for h in net.hosts:
-        h.cmd(f"(python3 backgroundHost.py {str(h)} &> {SDIR}/LOGs/{str(h)}.log) &")
+        # With parantesesis invade the mininet terminal of single host and get signals
+        h.cmd(f"python3 backgroundHost.py {str(h)} > {SDIR}/LOGs/{str(h)}.log &")
         # Start script slowly because jumps host if faster
-        time.sleep(0.01)
+        time.sleep(0.1)
         # net.terms += makeTerm(h, f"Background script on {str(h)}", cmd=f"python3 backgroundHost.py {str(h)}")
         print(f"Started {str(h)} script")
     print("All scripts started")
