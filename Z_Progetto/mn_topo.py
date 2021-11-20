@@ -151,7 +151,9 @@ def runMinimalTopo():
 
     for h in net.hosts:
         if DHCP:
-            h.cmd(f"sudo dhclient -4 -cf ./configs/mn_dhclient.conf") #+h.defaultIntf().name #-e HOST={str(h)}
+            # Unable to modify config file for evey host, so change temporary hostname
+            h.cmd(f"hostname {str(h)}")
+            h.cmd(f"dhclient -4")  # +h.defaultIntf().name #-e HOST={str(h)} -cf ./configs/mn_dhclient.conf
         # With parantesesis invade the mininet terminal of single host and get signals
         h.cmd(f"python3 backgroundHost.py {str(h)} > {SDIR}/LOGs/{str(h)}.log &")
         # Start script slowly because jumps host if faster
@@ -159,6 +161,9 @@ def runMinimalTopo():
         # net.terms += makeTerm(h, f"Background script on {str(h)}", cmd=f"python3 backgroundHost.py {str(h)}")
         print(f"Started {str(h)} script")
     print("All scripts started")
+
+    # Reset hostname
+    node1.cmd("hostname comnetsemu")
 
     # Run the summary status script NOT WORKING (not return the control to parent idk
     # command = f"xterm -T 'Status of all hosts' -e 'watch -n 1 python3 getStatusHosts.py'"
