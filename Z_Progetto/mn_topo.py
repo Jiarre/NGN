@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import time
 
 from mininet.cli import CLI
@@ -11,23 +12,27 @@ from mininet.term import makeTerm
 
 SDIR = "/tmp/NGN/hosts"
 TONULL = "&>/dev/null"
+DHCP = False
+if len(sys.argv) > 1:
+    if sys.argv[1] == '-dhcp':
+        DHCP = True
 
 class MinimalTopo( Topo ):
 
     def build( self ):
         hosts = []
-        h1 = self.addHost( 'h1' , ip="192.168.1.11" )
-        h2 = self.addHost( 'h2', ip="192.168.1.12" )
-        h3 = self.addHost( 'h3', ip="192.168.1.13" )
-        h4 = self.addHost( 'h4', ip="192.168.1.21" )
-        h5 = self.addHost( 'h5' , ip="192.168.1.22" )
-        h6 = self.addHost( 'h6', ip="192.168.1.23" )
-        h7 = self.addHost( 'h7', ip="192.168.1.31" )
-        h8 = self.addHost( 'h8', ip="192.168.1.32" )
-        h9 = self.addHost( 'h9' , ip="192.168.1.33" )
-        h10 = self.addHost( 'h10', ip="192.168.1.41" )
-        h11 = self.addHost( 'h11', ip="192.168.1.42" )
-        h12 = self.addHost( 'h12', ip="192.168.1.43" )
+        h1 = self.addHost('h1', ip=None)
+        h2 = self.addHost('h2', ip=None)
+        h3 = self.addHost('h3', ip=None)
+        h4 = self.addHost('h4', ip=None)
+        h5 = self.addHost('h5', ip=None)
+        h6 = self.addHost('h6', ip=None)
+        h7 = self.addHost('h7', ip=None)
+        h8 = self.addHost('h8', ip=None)
+        h9 = self.addHost('h9', ip=None)
+        h10 = self.addHost('h10', ip=None)
+        h11 = self.addHost('h11', ip=None)
+        h12 = self.addHost('h12', ip=None)
 
         hosts.append(h1)
         hosts.append(h2)
@@ -123,8 +128,30 @@ def runMinimalTopo():
     node3.cmd("sudo ovs-ofctl add-flow s3 dl_type=0x1111,action=controller")
     node4.cmd("sudo ovs-ofctl add-flow s4 dl_type=0x1111,action=controller")
 
-    print("*** Executing background scripts")
+    print("*** Setting up bridge network")
+    node1.cmd('sudo ovs-vsctl add-port s1 eth1')
+
+    if not DHCP:
+        print("*** Setting up static IP")
+        net.getNodeByName("h1").setIP(ip="192.168.1.11", prefixLen=24)
+        net.getNodeByName("h2").setIP(ip="192.168.1.12", prefixLen=24)
+        net.getNodeByName("h3").setIP(ip="192.168.1.13", prefixLen=24)
+        net.getNodeByName("h4").setIP(ip="192.168.1.21", prefixLen=24)
+        net.getNodeByName("h5").setIP(ip="192.168.1.22", prefixLen=24)
+        net.getNodeByName("h6").setIP(ip="192.168.1.23", prefixLen=24)
+        net.getNodeByName("h7").setIP(ip="192.168.1.31", prefixLen=24)
+        net.getNodeByName("h8").setIP(ip="192.168.1.32", prefixLen=24)
+        net.getNodeByName("h9").setIP(ip="192.168.1.33", prefixLen=24)
+        net.getNodeByName("h10").setIP(ip="192.168.1.41", prefixLen=24)
+        net.getNodeByName("h11").setIP(ip="192.168.1.42", prefixLen=24)
+        net.getNodeByName("h12").setIP(ip="192.168.1.43", prefixLen=24)
+        print("*** Executing background scripts")
+    else:
+        print("*** Executing background scripts and dhcp request")
+
     for h in net.hosts:
+        if DHCP:
+            h.cmd(f"sudo dhclient -4 -cf ./configs/mn_dhclient.conf") #+h.defaultIntf().name #-e HOST={str(h)}
         # With parantesesis invade the mininet terminal of single host and get signals
         h.cmd(f"python3 backgroundHost.py {str(h)} > {SDIR}/LOGs/{str(h)}.log &")
         # Start script slowly because jumps host if faster
