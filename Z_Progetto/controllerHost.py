@@ -65,35 +65,59 @@ def check_mac(mac):
 		mac)
 
 
-def create_packet(mac_src):
+def get_mac_arp(hostname):
+	ipaddr = socket.gethostbyname(hostname)
+	neigh = subprocess.check_output(f"ip neigh show {ipaddr}", shell=True).decode("utf-8")
+	macaddr = re.search('lladdr ([A-F0-9]{2}([:][A-F0-9]{2}){5})', neigh).group(1)
+	macbytes = bytes.fromhex(macaddr.replace(':', ''))
+	return macbytes
+
+
+def send_request_to_dnsserver(hostname):
+	eth_type = bytes.fromhex("1112")
+	# Send ETH/IP packet with different eth_type to DNSServer with the hostname of the dst host
+	# .....
+	return
+
+def get_request_to_dnsserver():
+	# Get ETH/IP packet with different eth_type with the mac of the dst host
+	# .....
+	# get_mac_arp(hostname)
+	return
+
+
+def create_packet(mac_src, machost_dst):
 	eth_type = bytes.fromhex("1111")  # int -> 4369
 	mac_dst = MAC_BROADCAST_B
 
-	wol_dst = input("Provide the hostname or complete MAC address\n"
-									"(accepted separator separator [:-\]) of the machine to WOL: ")
-	# Check mac address format
-	addr = check_mac(wol_dst)
-	hostname = re.fullmatch('^h\d+$',	wol_dst)
+	if machost_dst is None:
+		wol_dst = input("Provide the hostname or complete MAC address\n"
+										"(accepted separator separator [:-\]) of the machine to WOL: ")
+		# Check mac address format
+		addr = check_mac(wol_dst)
+		hostname = re.fullmatch('^h\d+$',	wol_dst)
 
-	# 1 match, or the MAC is invalid
-	if addr is not None:
-		# Remove mac separator [:-\s] and convert to bytes
-		mac_addr = bytes.fromhex(wol_dst.replace(wol_dst[2], ''))
-	else:
-		if hostname is not None and hostname.group(0) != get_hostname():
-			# Get index of the host and create MAC address from that with padding
-			mac_addr = bytes([int(wol_dst.replace('h', ''))]).rjust(6, b'\x00')
+		# 1 match, or the MAC is invalid
+		if addr is not None:
+			# Remove mac separator [:-\s] and convert to bytes
+			data = bytes.fromhex(wol_dst.replace(wol_dst[2], ''))
 		else:
-			raise ValueError('Incorrect MAC address format or hostname')
-
+			if hostname is not None and hostname.group(0) != get_hostname():
+				# Functionality depracted
+				# Get index of the host and create MAC address from that with padding
+				# data = bytes([int(wol_dst.replace('h', ''))]).rjust(6, b'\x00')
+				return None, wol_dst
+			else:
+				raise ValueError('Incorrect MAC address format or hostname')
+	else:
+		data = machost_dst
 	# The message is compose by the mac address of machine that would receive the WOL Magic Packet
-	data = mac_addr
 	payload = mac_dst + mac_src + eth_type + data
 
-	return payload
+	return payload, None
 
 
-def send_packet():
+def send_packet(mac_dst):
 	s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
 	if len(socket.if_nameindex()) > 2:
 		for i in socket.if_nameindex():
@@ -106,8 +130,13 @@ def send_packet():
 	interface = socket.if_indextoname(idx)
 	# Specification seams not working, only interfeace is necessary
 	s.bind((interface, 0x1111, socket.PACKET_BROADCAST))
-	data = create_packet(s.getsockname()[4])
-	s.send(data)
+	data, hostname = create_packet(s.getsockname()[4], mac_dst)
+	# Check if the 0x1111 packet is delegated to DNSServer
+	if data is not None:
+		s.send(data)
+	else:
+		# Delegate DNSServer
+		send_request_to_dnsserver(hostname)
 
 
 def check_packet(data) -> bool:
@@ -136,7 +165,7 @@ def get_hostname() -> str:
 		print("Error recognising hostname")
 
 
-def get_packet():
+def get_magic_packet():
 	s_rec = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_WOL))
 	# s_rec.bind((interface, 0)) # not necessary -> listening on all interfaces
 	size = WOL_SIZE
