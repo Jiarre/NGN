@@ -1,23 +1,3 @@
-# Copyright (C) 2011 Nippon Telegraph and Telephone Corporation.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-# implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""
-An OpenFlow 1.0 L2 learning switch implementation.
-"""
-
-
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER
@@ -58,17 +38,11 @@ class SimpleSwitch(app_manager.RyuApp):
 
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
-
-        if eth.ethertype == ether_types.ETH_TYPE_LLDP:
-            # ignore lldp packet
-            return
         dst = eth.dst
         src = eth.src
-
         dpid = datapath.id
         self.mac_to_port.setdefault(dpid, {})
 
-        self.logger.info("packet in %s %s %s %s with ethertype %s", dpid, src, dst, msg.in_port, eth.ethertype)
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
             data = msg.data
@@ -78,20 +52,14 @@ class SimpleSwitch(app_manager.RyuApp):
             self.logger.info("L'host con mac %s vuole svegliare l'host con mac %s", src, wol_dest)
             dst = wol_dest
             mex = bytes.fromhex("F"*12) + (bytes.fromhex(w)*16)
-            # mex = ('F'.encode('utf-8'))*12 + (w.encode('utf-8'))*16
             
             e = ethernet.ethernet(dst=dst, src=src, ethertype=0x0842)
             k = e.serialize(mex, None)
-            # self.logger.info("k: %s",k)
             p = packet.Packet()
-            # p.add_protocol(e)
             
             p.serialize()
             data = k+mex
-            
-        # self.logger.info("data: %s",data)
 
-        # learn a mac address to avoid FLOOD next time.
         self.mac_to_port[dpid][src] = msg.in_port
 
         if dst in self.mac_to_port[dpid]:
@@ -101,29 +69,10 @@ class SimpleSwitch(app_manager.RyuApp):
 
         actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
 
-        # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:
             self.add_flow(datapath, msg.in_port, dst, src, actions)
-
-        out = None
         
         out = datapath.ofproto_parser.OFPPacketOut(
             datapath=datapath, buffer_id=msg.buffer_id, in_port=msg.in_port,
             actions=actions, data=data)
         datapath.send_msg(out)
-
-    @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
-    def _port_status_handler(self, ev):
-        msg = ev.msg
-        reason = msg.reason
-        port_no = msg.desc.port_no
-
-        ofproto = msg.datapath.ofproto
-        if reason == ofproto.OFPPR_ADD:
-            self.logger.info("port added %s", port_no)
-        elif reason == ofproto.OFPPR_DELETE:
-            self.logger.info("port deleted %s", port_no)
-        elif reason == ofproto.OFPPR_MODIFY:
-            self.logger.info("port modified %s", port_no)
-        else:
-            self.logger.info("Illeagal port state %s %s", port_no, reason)
