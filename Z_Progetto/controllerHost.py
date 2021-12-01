@@ -66,9 +66,21 @@ def check_mac(mac):
 
 
 def get_mac_arp(hostname):
-	ipaddr = socket.gethostbyname(hostname)
+	try:
+		ipaddr = socket.gethostbyname(hostname)
+	except socket.gaierror:
+		print("Error resolving hostname" + "\n"
+					"Is DNS server running?")
+		if input("Are you running mininet topology without DNS? [Y/N]: ").lower() == 'y':
+			# Get index of the host and create MAC address from that with padding (MAX Host=255)
+			macbytes = bytes([int(hostname.replace('h', ''))]).rjust(6, b'\x00')
+			return macbytes
+		else:
+			print("Provide full MAC address instead of hostname")
+			return None
+
 	neigh = subprocess.check_output(f"ip neigh show {ipaddr}", shell=True).decode("utf-8")
-	if re.search('lladdr ([a-f0-9]{2}([:][a-f0-9]{2}){5})', neigh) != None:
+	if re.search('lladdr ([a-f0-9]{2}([:][a-f0-9]{2}){5})', neigh) is not None:
 		macaddr = re.search('lladdr ([a-f0-9]{2}([:][a-f0-9]{2}){5})', neigh).group(1)
 		macbytes = bytes.fromhex(macaddr.replace(':', ''))
 		return macbytes
@@ -76,24 +88,30 @@ def get_mac_arp(hostname):
 		return None
 
 
-def send_request_to_dnsserver(hostname):
-	eth_type = bytes.fromhex("1112")
+def request_intf(dnssrv=False):
 	s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
-	if len(socket.if_nameindex()) > 2:
+	# If DNSServer request this function don't ask which intf
+	if (len(socket.if_nameindex()) > 2) and (dnssrv is False):
 		for i in socket.if_nameindex():
 			print(str(i[0]) + " -> " + i[1])
 		idx = int(input("Choose the index of the interface where send the packet: "))
 	else:
 		# Speed up in best case scenarios, excluding loopback interface
 		idx = 2
-
 	interface = socket.if_indextoname(idx)
+
+	return s, interface
+
+
+def send_request_to_dnsserver(hostname):
+	s, interface = request_intf()
 	# Specification seams not working, only interfeace is necessary
 	s.bind((interface, 0x1112, socket.PACKET_BROADCAST))
-	data, hostname = create_dns_packet(s.getsockname()[4],hostname.encode('utf-16'))
+	data, hostname = create_dns_packet(s.getsockname()[4], hostname.encode('utf-16'))
 	if data is not None:
 		s.send(data)
 	return
+
 
 def get_request_to_dnsserver():
 	s_rec = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x1112))
@@ -103,9 +121,10 @@ def get_request_to_dnsserver():
 	hostname = payload.decode('utf-16')[8:].strip('\x00')
 	
 	mac_dst = get_mac_arp(hostname)
-	print("Richiesta di svegliare l'host {} con mac {}".format(hostname,mac_dst))
-	if mac_dst != None:
-		send_packet(mac_dst)
+	print("Richiesta di svegliare l'host {} con mac {}".format(hostname, mac_dst))
+	if mac_dst is not None:
+		# Send Packet without asking for the interface on DNSServer
+		send_packet(mac_dst, dnssrv=True)
 	else:
 		print("Hostname Errato")
 
@@ -128,19 +147,22 @@ def create_packet(mac_src, machost_dst):
 			# Remove mac separator [:-\s] and convert to bytes
 			data = bytes.fromhex(wol_dst.replace(wol_dst[2], ''))
 		else:
-			if hostname is not None and hostname.group(0) != get_hostname():
-				# Functionality depracted
-				# Get index of the host and create MAC address from that with padding
-				# data = bytes([int(wol_dst.replace('h', ''))]).rjust(6, b'\x00')
-				return None, wol_dst
-			else:
+			if hostname is None:
 				raise ValueError('Incorrect MAC address format or hostname')
+			elif hostname.group(0) == get_hostname():
+				raise ValueError(f'{hostname.group(0)} is this host')
+			else:
+				# Return data=None as a flag to delegate DNSServer
+				return None, wol_dst
+
 	else:
 		data = machost_dst
 	# The message is compose by the mac address of machine that would receive the WOL Magic Packet
 	payload = mac_dst + mac_src + eth_type + data
 
 	return payload, None
+
+
 def create_dns_packet(mac_src, machost_dst):
 	eth_type = bytes.fromhex("1112")
 	mac_dst = MAC_BROADCAST_B
@@ -150,17 +172,9 @@ def create_dns_packet(mac_src, machost_dst):
 
 	return payload, None
 
-def send_packet(mac_dst):
-	s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
-	"""if len(socket.if_nameindex()) > 2:
-		for i in socket.if_nameindex():
-			print(str(i[0]) + " -> " + i[1])
-		idx = int(input("Choose the index of the interface where send the packet: "))
-	else:
-		# Speed up in best case scenarios, excluding loopback interface"""
-	idx = 2
 
-	interface = socket.if_indextoname(idx)
+def send_packet(mac_dst, dnssrv=False):
+	s, interface = request_intf(dnssrv)
 	# Specification seams not working, only interfeace is necessary
 	s.bind((interface, 0x1111, socket.PACKET_BROADCAST))
 	data, hostname = create_packet(s.getsockname()[4], mac_dst)
@@ -173,7 +187,7 @@ def send_packet(mac_dst):
 		if h is not None:
 			send_packet(h)
 		else:
-		# Delegate DNSServer
+			# Delegate DNSServer
 			send_request_to_dnsserver(hostname)
 
 

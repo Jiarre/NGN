@@ -10,8 +10,12 @@ sudo rm /etc/resolve.conf (it's a symlink)
 - Execute backgroundDNSServer on dhcp/dns server
 
 ## How to wakeup / shutdown hosts ##
-On a mininet's child node execute "sendPacketHost.py" and specify mac-address, ip or hostname
+On a mininet's child node execute "sendPacketHost.py" and specify mac-address or hostname
 if the backgroundDNSServer is running hostname and ip specified will wake up, else nothing will happen
 
 ## How to get information ##
 Even if you can't ping down hosts you can still use "getStatusHost" to get the status of every host of the network
+
+
+## Limitations ##
+Maximum number of hosts is 255
