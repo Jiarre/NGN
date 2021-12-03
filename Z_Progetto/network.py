@@ -10,7 +10,6 @@ from mininet.log import setLogLevel
 from mininet.net import Mininet
 from mininet.topo import Topo
 from mininet.node import RemoteController, OVSSwitch
-from mininet.term import makeTerm
 
 SDIR = "/tmp/NGN/hosts"
 TONULL = "&>/dev/null"
@@ -29,6 +28,8 @@ if len(sys.argv) > 1:
             H = int(sys.argv[i+1])
         elif sys.argv[i] == '-dhcp':
             DHCP = True
+
+os.system("sudo /usr/bin/bash resolved.sh")
 
 class Topology(Topo):
 

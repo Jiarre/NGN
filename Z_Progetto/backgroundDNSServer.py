@@ -1,7 +1,11 @@
 #!/usr/bin/python3
 import controllerHost
+import os
 from datetime import datetime
 
+print("--- Applying Setting ---")
+# Restart dnsmasq service
+os.system("systemctl restart dnsmasq.service")
 
 print("--- Listening ---")
 print(str(datetime.now()) + '\n', flush=True)
