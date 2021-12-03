@@ -4,11 +4,14 @@ import sys
 import time
 import math
 
+from controllerHost import get_status
+from mininet.log import output, error
 from mininet.cli import CLI
 from mininet.log import setLogLevel
 from mininet.net import Mininet
 from mininet.topo import Topo
 from mininet.node import RemoteController, OVSSwitch
+
 
 SDIR = "/tmp/NGN/hosts"
 TONULL = "&>/dev/null"
@@ -27,14 +30,68 @@ if len(sys.argv) > 1:
                 H = int(sys.argv[i+1])
             elif sys.argv[i] == '-dhcp':
                 DHCP = True
-            elif (not int(sys.argv[i])) or int(sys.argv[i])>95:
+            elif (not int(sys.argv[i])) or int(sys.argv[i]) > 99:
                 raise Exception
         except:
             print("Invalid arguments")
             exit(-1)
 
-
 os.system("sudo /usr/bin/bash resolved.sh")
+
+
+# Override function ping for dhcp and check status
+class Mininet(Mininet):
+    def ping(self, hosts=None, timeout=None):
+        """Ping between all specified hosts.
+           hosts: list of hosts
+           timeout: time to wait for a response, as string
+           returns: ploss packet loss percentage"""
+        # should we check if running?
+        packets = 0
+        lost = 0
+        ploss = None
+        if not hosts:
+            hosts = self.hosts
+            output('*** Ping: testing ping reachability\n')
+        for node in hosts:
+            if get_status(str(node.name)) == 'UP':
+                output('%s -> ' % node.name)
+                for dest in hosts:
+                    if node != dest:
+                        opts = ''
+                        if timeout:
+                            opts = '-W %s' % timeout
+                        if dest.intfs:
+                            # If DHCP is not running, get IP hardcoded
+                            if not DHCP:
+                                pdest = dest.IP()
+                            else:
+                                pdest = dest.name
+                            result = node.cmd('LANG=C ping -c1 %s %s' %
+                                              (opts, pdest))
+                            sent, received = self._parsePing(result)
+                        else:
+                            sent, received = 0, 0
+                        packets += sent
+                        if received > sent:
+                            error('*** Error: received too many packets')
+                            error('%s' % result)
+                            node.cmdPrint('route')
+                            exit(1)
+                        lost += sent - received
+                        output(('%s ' % dest.name) if received else 'X ')
+                output('\n')
+            else:
+                output('%s -> DOWN\n' % node.name)
+        if packets > 0:
+            ploss = 100.0 * lost / packets
+            received = packets - lost
+            output("*** Results: %i%% dropped (%d/%d received)\n" %
+                   (ploss, received, packets))
+        else:
+            ploss = 0
+            output("*** Warning: No packets sent\n")
+        return ploss
 
 
 class Topology(Topo):
@@ -42,14 +99,14 @@ class Topology(Topo):
     def build(self):
         global hosts, switches
         print(f"Starting the newtork with {H} hosts and {S} switches")
-        for i in range(1,H+1):
+        for i in range(1, H+1):
             if DHCP:
                 tmp = self.addHost(f'h{i}', ip=None)
             else:
                 tmp = self.addHost(f'h{i}')
             hosts.append(tmp)
             print(f"Host h{i} created")
-        for i in range(1,S+1):
+        for i in range(1, S+1):
             tmp = self.addSwitch(f's{i}')
             switches.append(tmp)
             print(f"Switch s{i} created")

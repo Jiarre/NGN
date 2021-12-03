@@ -71,7 +71,7 @@ class Controller(app_manager.RyuApp):
         if eth.ethertype == 4369:   # if ethertype == 0x1111 modify 
             w = msg.data.hex()[28:40]
             wol_dest = w[0:2]+':'+w[2:4] + ':'+w[4:6] + ':'+w[6:8] + ':'+w[8:10] + ':'+w[10:12]
-            self.logger.info("L'host con mac %s vuole svegliare l'host con mac %s", src, wol_dest)
+            self.logger.info("Host with mac %s would wake host with mac %s", src, wol_dest)
             dst = wol_dest
             mex = bytes.fromhex("F"*12) + (bytes.fromhex(w)*16)
             

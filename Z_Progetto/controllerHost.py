@@ -72,20 +72,24 @@ def get_mac_arp(hostname):
 		print("Error resolving hostname" + "\n"
 					"Is DNS server running?")
 		if input("Are you running mininet topology without DNS? [Y/N]: ").lower() == 'y':
-			# Get index of the host and create MAC address from that with padding (MAX Host=255)
-			macbytes = bytes([int(hostname.replace('h', ''))]).rjust(6, b'\x00')
-			return macbytes
+			if re.fullmatch('^h\d+$', hostname) is not None:
+				# Get index of the host and create MAC address from that with padding (MAX Host=255)
+				macbytes = bytes([int(hostname.replace('h', ''))]).rjust(6, b'\x00')
+				return macbytes, None
+			else:
+				print("Provided hostname is not a well formed mininet hostname")
+				return None, None
 		else:
 			print("Provide full MAC address instead of hostname")
-			return None
+			return None, None
 
 	neigh = subprocess.check_output(f"ip neigh show {ipaddr}", shell=True).decode("utf-8")
 	if re.search('lladdr ([a-f0-9]{2}([:][a-f0-9]{2}){5})', neigh) is not None:
 		macaddr = re.search('lladdr ([a-f0-9]{2}([:][a-f0-9]{2}){5})', neigh).group(1)
 		macbytes = bytes.fromhex(macaddr.replace(':', ''))
-		return macbytes
+		return macbytes, macaddr
 	else:
-		return None
+		return None, None
 
 
 def request_intf(dnssrv=False):
@@ -119,14 +123,14 @@ def get_request_to_dnsserver():
 	size = 255
 	payload = s_rec.recv(size)
 	hostname = payload.decode('utf-16')[8:].strip('\x00')
-	
-	mac_dst = get_mac_arp(hostname)
-	print("Richiesta di svegliare l'host {} con mac {}".format(hostname, mac_dst))
-	if mac_dst is not None:
+
+	mac_dst_bin, mac_dst = get_mac_arp(hostname)
+	print("Request to wake host {} with mac {}".format(hostname, mac_dst))
+	if mac_dst_bin is not None:
 		# Send Packet without asking for the interface on DNSServer
-		send_packet(mac_dst, dnssrv=True)
+		send_packet(mac_dst_bin, dnssrv=True)
 	else:
-		print("Hostname Errato")
+		print("Hostname Incorrect")
 
 	return
 
@@ -140,20 +144,24 @@ def create_packet(mac_src, machost_dst):
 										"(accepted separator separator [:-\]) of the machine to WOL: ")
 		# Check mac address format
 		addr = check_mac(wol_dst)
-		hostname = re.fullmatch('^h\d+$',	wol_dst)
-
-		# 1 match, or the MAC is invalid
-		if addr is not None:
-			# Remove mac separator [:-\s] and convert to bytes
-			data = bytes.fromhex(wol_dst.replace(wol_dst[2], ''))
-		else:
-			if hostname is None:
-				raise ValueError('Incorrect MAC address format or hostname')
-			elif hostname.group(0) == get_hostname():
-				raise ValueError(f'{hostname.group(0)} is this host')
+		# Match all posssibile hostname (no only numbers, space etc)
+		hostname = re.fullmatch('^(?!\d*$)\w+$',	wol_dst)
+		try:
+			# 1 match, or the MAC is invalid
+			if addr is not None:
+				# Remove mac separator [:-\s] and convert to bytes
+				data = bytes.fromhex(wol_dst.replace(wol_dst[2], ''))
 			else:
-				# Return data=None as a flag to delegate DNSServer
-				return None, wol_dst
+				if hostname is None:
+					raise ValueError('Incorrect MAC address format or hostname')
+				elif hostname.group(0) == get_hostname():
+					raise ValueError(f'{hostname.group(0)} is this host')
+				else:
+					# Return data=None as a flag to delegate DNSServer
+					return None, wol_dst
+		except ValueError as verr:
+			print("Exception caught: "+repr(verr))
+			exit(-1)
 
 	else:
 		data = machost_dst
@@ -183,7 +191,7 @@ def send_packet(mac_dst, dnssrv=False):
 		s.send(data)
 	else:
 		# Trying to get mac from local arp
-		h = get_mac_arp(hostname)
+		h = get_mac_arp(hostname)[0]
 		if h is not None:
 			send_packet(h)
 		else:

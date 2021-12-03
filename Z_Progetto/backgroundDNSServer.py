@@ -11,6 +11,6 @@ print("--- Listening ---")
 print(str(datetime.now()) + '\n', flush=True)
 while True:
 	controllerHost.get_request_to_dnsserver()
-	print("Destination host recieved, forward the creation of personal packet")
+	print("Destination host received, forward the creation of personal packet")
 	print(str(datetime.now()) + '\n', flush=True)
 
