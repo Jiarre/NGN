@@ -65,22 +65,26 @@ def check_mac(mac):
 		mac)
 
 
-def get_mac_arp(hostname):
+def get_mac_arp(hostname, dnssrv=False):
 	try:
 		ipaddr = socket.gethostbyname(hostname)
 	except socket.gaierror:
-		print("Error resolving hostname" + "\n"
-					"Is DNS server running?")
-		if input("Are you running mininet topology without DNS? [Y/N]: ").lower() == 'y':
-			if re.fullmatch('^h\d+$', hostname) is not None:
-				# Get index of the host and create MAC address from that with padding (MAX Host=255)
-				macbytes = bytes([int(hostname.replace('h', ''))]).rjust(6, b'\x00')
-				return macbytes, None
+		if not dnssrv:
+			print("Error resolving hostname" + "\n"
+						"Is DNS server running?")
+			if input("Are you running mininet topology without DNS? [Y/N]: ").lower() == 'y':
+				if re.fullmatch('^h\d+$', hostname) is not None:
+					# Get index of the host and create MAC address from that with padding (MAX Host=255)
+					macbytes = bytes([int(hostname.replace('h', ''))]).rjust(6, b'\x00')
+					return macbytes, None
+				else:
+					print("Provided hostname is not a well formed mininet hostname")
+					return None, None
 			else:
-				print("Provided hostname is not a well formed mininet hostname")
+				print("Provide full MAC address instead of hostname")
 				return None, None
 		else:
-			print("Provide full MAC address instead of hostname")
+			print("Provided hostname is not know by DNS server")
 			return None, None
 
 	neigh = subprocess.check_output(f"ip neigh show {ipaddr}", shell=True).decode("utf-8")
@@ -124,7 +128,7 @@ def get_request_to_dnsserver():
 	payload = s_rec.recv(size)
 	hostname = payload.decode('utf-16')[8:].strip('\x00')
 
-	mac_dst_bin, mac_dst = get_mac_arp(hostname)
+	mac_dst_bin, mac_dst = get_mac_arp(hostname, dnssrv=True)
 	print("Request to wake host {} with mac {}".format(hostname, mac_dst))
 	if mac_dst_bin is not None:
 		# Send Packet without asking for the interface on DNSServer
@@ -145,7 +149,7 @@ def create_packet(mac_src, machost_dst):
 		# Check mac address format
 		addr = check_mac(wol_dst)
 		# Match all posssibile hostname (no only numbers, space etc)
-		hostname = re.fullmatch('^(?!\d*$)\w+$',	wol_dst)
+		hostname = re.fullmatch('^(?!\d*$)\w+\.\w+$',	wol_dst)
 		try:
 			# 1 match, or the MAC is invalid
 			if addr is not None:
