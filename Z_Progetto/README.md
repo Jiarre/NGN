@@ -11,7 +11,7 @@ sudo rm /etc/resolve.conf (it's a symlink)
 
 ## How to wakeup / shutdown hosts ##
 On a mininet's child node execute "sendPacketHost.py" and specify mac-address or hostname
-if the backgroundDNSServer is running hostname and ip specified will wake up, else nothing will happen
+if the backgroundDNSServer is running hostname and mac specified will wake up, else nothing will happen
 
 ## How to get information ##
 Even if you can't ping down hosts you can still use "getStatusHost" to get the status of every host of the network
