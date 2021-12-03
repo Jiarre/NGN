@@ -8,11 +8,11 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 
 
-class SimpleSwitch13(app_manager.RyuApp):
+class Controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(SimpleSwitch13, self).__init__(*args, **kwargs)
+        super(Controller, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -22,13 +22,13 @@ class SimpleSwitch13(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         match = parser.OFPMatch()
-        match1 = parser.OFPMatch(eth_type=0x1111)
-        match2 = parser.OFPMatch(eth_type=0x1112)
+        match1 = parser.OFPMatch(eth_type=0x1111) #added match for 0x1111 packets
+        
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
         self.add_flow(datapath, 0, match1, actions)
-        self.add_flow(datapath, 0, match2, actions)
+        
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
@@ -64,11 +64,11 @@ class SimpleSwitch13(app_manager.RyuApp):
         dpid = format(datapath.id, "d").zfill(16)
         self.mac_to_port.setdefault(dpid, {})
 
-        #self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+        
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
             data = msg.data
-        if eth.ethertype == 4369:   # 0x1111
+        if eth.ethertype == 4369:   # if ethertype == 0x1111 modify 
             w = msg.data.hex()[28:40]
             wol_dest = w[0:2]+':'+w[2:4] + ':'+w[4:6] + ':'+w[6:8] + ':'+w[8:10] + ':'+w[10:12]
             self.logger.info("L'host con mac %s vuole svegliare l'host con mac %s", src, wol_dest)
@@ -77,10 +77,8 @@ class SimpleSwitch13(app_manager.RyuApp):
             
             e = ethernet.ethernet(dst=dst, src=src, ethertype=0x0842)
             k = e.serialize(mex, None)
-            p = packet.Packet()
             
-            p.serialize()
-            data = k+mex
+            data = k+mex  # generate payload MagicPacket
 
         self.mac_to_port[dpid][src] = in_port
 
@@ -91,7 +89,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         actions = [parser.OFPActionOutput(out_port)]
 
-        # install a flow to avoid packet_in next time
+        
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
             if msg.buffer_id != ofproto.OFP_NO_BUFFER:
