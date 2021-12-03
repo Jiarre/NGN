@@ -4,7 +4,6 @@ import sys
 import time
 import math
 
-
 from mininet.cli import CLI
 from mininet.log import setLogLevel
 from mininet.net import Mininet
@@ -20,16 +19,23 @@ hosts = []
 switches = []
 
 if len(sys.argv) > 1:
-    for i in range(1,len(sys.argv)):
-        
-        if sys.argv[i] == '-s':
-            S = int(sys.argv[i+1])
-        elif sys.argv[i] == '-h':
-            H = int(sys.argv[i+1])
-        elif sys.argv[i] == '-dhcp':
-            DHCP = True
+    for i in range(1, len(sys.argv)):
+        try:
+            if sys.argv[i] == '-s':
+                S = int(sys.argv[i+1])
+            elif sys.argv[i] == '-h':
+                H = int(sys.argv[i+1])
+            elif sys.argv[i] == '-dhcp':
+                DHCP = True
+            elif (not int(sys.argv[i])) or int(sys.argv[i])>95:
+                raise Exception
+        except:
+            print("Invalid arguments")
+            exit(-1)
+
 
 os.system("sudo /usr/bin/bash resolved.sh")
+
 
 class Topology(Topo):
 
@@ -50,31 +56,31 @@ class Topology(Topo):
 
         d = math.ceil(H/S)
        
-        print(f"{d}Host per Switch")
+        print(f"{d} Host per Switch")
 
         count = 0
         h_index = 0
         s_index = 0
 
-        for i in range(0,H):
+        for i in range(0, H):
 
             if count < d and s_index < S:
                 print(f"1 h_index {i} s_index {s_index} d {d} count {count}")
-                self.addLink(hosts[i],switches[s_index])
-                count+=1
+                self.addLink(hosts[i], switches[s_index])
+                count += 1
             elif count == d:
                 print(f"2 h_index {i} s_index {s_index+1} d {d} count {count}")
-                self.addLink(hosts[i],switches[s_index+1])
-                s_index+=1
-                count=1
+                self.addLink(hosts[i], switches[s_index+1])
+                s_index += 1
+                count = 1
             elif s_index == S:
                 print(f"3 h_index {i} s_index {s_index} d {d} count {count}")
-                self.addLink(hosts[i],switches[s_index])
+                self.addLink(hosts[i], switches[s_index])
 
-        for i in range(1,S-1):
+        for i in range(1, S-1):
             if i == 1:
-                self.addLink(switches[i],switches[i-1])
-            self.addLink(switches[i],switches[i+1])
+                self.addLink(switches[i], switches[i-1])
+            self.addLink(switches[i], switches[i+1])
 
 
         print("*** Setting files and directories")
@@ -106,7 +112,7 @@ class Topology(Topo):
 def runTopo():
     topo = Topology()
     net = Mininet(topo=topo,
-        controller=lambda name: RemoteController( name, ip='127.0.0.1' ),
+        controller=lambda name: RemoteController(name, ip='127.0.0.1'),
         switch=OVSSwitch,
         autoSetMacs=True)
 
@@ -137,5 +143,5 @@ def runTopo():
 
 if __name__ == '__main__':
 # This runs if this file is executed directly
-    setLogLevel( 'info' )
+    setLogLevel('info')
     runTopo()
