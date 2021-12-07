@@ -13,4 +13,4 @@ Even if you can't ping down hosts you can still use "getStatusHost.py" to get th
 
 
 ## Limitations ##
-Maximum number of hosts is 99
+Maximum number of hosts is 99, Minimum number of switches is 1
