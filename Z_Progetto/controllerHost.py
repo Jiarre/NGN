@@ -149,7 +149,7 @@ def create_packet(mac_src, machost_dst):
 		# Check mac address format
 		addr = check_mac(wol_dst)
 		# Match all posssibile hostname (no only numbers, space etc)
-		hostname = re.fullmatch('^(?!\d*$)\w+\.\w+$',	wol_dst)
+		hostname = re.fullmatch('^(?!\d*$)\w+\.*\w+$',	wol_dst)
 		try:
 			# 1 match, or the MAC is invalid
 			if addr is not None:
