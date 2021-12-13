@@ -6,6 +6,6 @@ systemctl stop systemd-resolved.service;
 RFILE='/etc/resolv.conf';
 if [[ -L "$RFILE" ]]
 then
-  echo "Removing symlink to /run/systemd/resolve/resolv.conf"
-  $(rm $RFILE);
+  echo "Removing symlink to /run/systemd/resolve/stub-resolv.conf"
+  $(mv $RFILE $RFILE.org; echo "NGN Project" > $RFILE);
 fi

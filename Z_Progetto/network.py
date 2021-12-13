@@ -36,8 +36,6 @@ if len(sys.argv) > 1:
             print("Invalid arguments")
             exit(-1)
 
-os.system("sudo /usr/bin/bash resolved.sh")
-
 
 # Override function ping for dhcp and check status
 class Mininet(Mininet):
@@ -139,7 +137,6 @@ class Topology(Topo):
                 self.addLink(switches[i], switches[i-1])
             self.addLink(switches[i], switches[i+1])
 
-
         print("*** Setting files and directories")
         os.umask(0000)
         if os.path.exists(SDIR):
@@ -155,7 +152,7 @@ class Topology(Topo):
             try:
                 os.close(os.open(fileL, os.O_CREAT | os.O_WRONLY, 0o777))
                 f = open(os.open(fileS, os.O_CREAT | os.O_WRONLY, 0o777), 'w')
-                if host == "h1" :
+                if host == "h1":
                     # Only h1 stars UP
                     f.write("UP")
                 else:
@@ -165,6 +162,7 @@ class Topology(Topo):
                 print("Failed creating files")
             else:
                 print(f"Files of host {host} created")
+
 
 def runTopo():
     topo = Topology()
@@ -177,6 +175,9 @@ def runTopo():
     node1 = net.getNodeByName("s1")
     print("*** Setting up bridge network")
     node1.cmd('sudo ovs-vsctl add-port s1 eth1')
+    if DHCP:
+        print("*** Setting up correctly resolv.conf ***")
+        os.system("sudo /usr/bin/bash util/resolved.sh")
     print("*** Executing background scripts and dhcp request (if needed)")
     for h in net.hosts:
         if DHCP:
@@ -197,8 +198,11 @@ def runTopo():
     # After the user exits the CLI, shutdown the network.
     net.stop()
     shutil.rmtree(SDIR)
+    if DHCP:
+        os.system("sudo /usr/bin/bash util/resolved_restore.sh")
+
 
 if __name__ == '__main__':
-# This runs if this file is executed directly
+    # This runs if this file is executed directly
     setLogLevel('info')
     runTopo()

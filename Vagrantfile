@@ -203,7 +203,7 @@ But the script will check and perform upgrade automatically and it does not take
     # comnetsemu.vm.network "private_network", ip: "192.168.0.2"
     
     # If the name of interface does not exist, vagrant ask the correct name
-    config.vm.network "public_network", bridge: "", ip: "192.168.33.2"
+    config.vm.network "public_network", bridge: "", ip: "192.168.2.252"
 
     # Enable X11 forwarding
     comnetsemu.ssh.forward_agent = true

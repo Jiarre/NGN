@@ -52,6 +52,7 @@ def update_status(hostname):
 		status = "DOWN"
 	else:
 		print(hostname + " has an Invalid status")
+		return
 
 	set_status(hostname, status)
 	ipt_roules(status)
@@ -122,6 +123,7 @@ def send_request_to_dnsserver(hostname):
 
 
 def get_request_to_dnsserver():
+	# Funzione di ascolto per DNSServer
 	s_rec = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x1112))
 	# s_rec.bind((interface, 0)) # not necessary -> listening on all interfaces
 	size = 255
@@ -241,3 +243,4 @@ def get_magic_packet():
 		else:
 			print("Error recognising hostname")
 
+# END

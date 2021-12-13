@@ -22,13 +22,12 @@ class Controller(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         match = parser.OFPMatch()
-        match1 = parser.OFPMatch(eth_type=0x1111) #added match for 0x1111 packets
+        match1 = parser.OFPMatch(eth_type=0x1111)  # added match for 0x1111 packets
         
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
         self.add_flow(datapath, 0, match1, actions)
-        
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
@@ -64,7 +63,6 @@ class Controller(app_manager.RyuApp):
         dpid = format(datapath.id, "d").zfill(16)
         self.mac_to_port.setdefault(dpid, {})
 
-        
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
             data = msg.data
@@ -89,7 +87,6 @@ class Controller(app_manager.RyuApp):
 
         actions = [parser.OFPActionOutput(out_port)]
 
-        
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
             if msg.buffer_id != ofproto.OFP_NO_BUFFER:
@@ -97,7 +94,6 @@ class Controller(app_manager.RyuApp):
                 return
             else:
                 self.add_flow(datapath, 1, match, actions)
-        
 
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
                                   in_port=in_port, actions=actions, data=data)
